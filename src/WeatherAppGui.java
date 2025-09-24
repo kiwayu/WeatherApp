@@ -80,26 +80,64 @@ public class WeatherAppGui extends JFrame {
         cardPanel.setOpaque(false);
         add(cardPanel);
 
-        // Search field at top
-        searchTextField = new JTextField("Enter city name...");
+        // Search field at top with rounded corners
+        searchTextField = new JTextField("Enter city name...") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Paint rounded background
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                
+                // Paint border
+                g2d.setColor(new Color(255, 255, 255, 100));
+                g2d.setStroke(new BasicStroke(1));
+                g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         searchTextField.setBounds(20, 10, 200, 30);
         searchTextField.setFont(new Font("Helvetica Neue", Font.PLAIN, 12));
-        searchTextField.setBorder(new CompoundBorder(
-                new LineBorder(new Color(255, 255, 255, 100), 1, true),
-                new EmptyBorder(5, 10, 5, 10)
-        ));
         searchTextField.setBackground(new Color(255, 255, 255, 150));
         searchTextField.setForeground(new Color(80, 80, 80));
+        searchTextField.setOpaque(false);
+        searchTextField.setBorder(new EmptyBorder(5, 10, 5, 10));
         searchTextField.addFocusListener(createSearchFieldFocusListener());
         searchTextField.addActionListener(this::searchWeather);
         cardPanel.add(searchTextField);
 
-        // Search button
-        JButton searchButton = new JButton("Search");
+        // Search button with rounded corners
+        JButton searchButton = new JButton("Search") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Paint rounded background
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                
+                // Paint border
+                g2d.setColor(new Color(255, 255, 255, 100));
+                g2d.setStroke(new BasicStroke(1));
+                g2d.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 10, 10);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         searchButton.setBounds(230, 10, 60, 30);
         searchButton.setFont(new Font("Helvetica Neue", Font.PLAIN, 10));
         searchButton.setBackground(new Color(255, 255, 255, 150));
-        searchButton.setBorder(new LineBorder(new Color(255, 255, 255, 100), 1, true));
+        searchButton.setForeground(new Color(80, 80, 80));
+        searchButton.setOpaque(false);
+        searchButton.setBorder(new EmptyBorder(5, 8, 5, 8));
         searchButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         searchButton.addActionListener(this::searchWeather);
         cardPanel.add(searchButton);
@@ -270,8 +308,11 @@ public class WeatherAppGui extends JFrame {
     private void searchWeather(ActionEvent e) {
         String userInput = searchTextField.getText().trim();
         
+        // Extract city name if format is "City, Country"
+        String cityName = userInput.contains(",") ? userInput.split(",")[0].trim() : userInput;
+        
         // Validate input
-        if (userInput.isEmpty() || userInput.equals("Enter city name...")) {
+        if (cityName.isEmpty() || cityName.equals("Enter city name...")) {
             JOptionPane.showMessageDialog(this, "Please enter a city name.", "Invalid Input", JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -281,18 +322,18 @@ public class WeatherAppGui extends JFrame {
             temperatureText.setText("Loading...");
             locationText.setText("Fetching data...");
             
-            // Retrieve weather data
-            weatherData = WeatherApp.getWeatherData(userInput);
+            // Retrieve weather data using the city name
+            weatherData = WeatherApp.getWeatherData(cityName);
             
             if (weatherData == null) {
-                JOptionPane.showMessageDialog(this, "Could not find weather data for '" + userInput + "'. Please check the city name and try again.", "Location Not Found", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Could not find weather data for '" + cityName + "'. Please check the city name and try again.", "Location Not Found", JOptionPane.ERROR_MESSAGE);
                 temperatureText.setText("--°");
                 locationText.setText("Enter a city");
                 return;
             }
 
-            // Update location name
-            locationText.setText(userInput);
+            // Update location name with formatted display (keep full user input if available)
+            locationText.setText(userInput.contains(",") ? userInput : cityName);
 
             // Update weather condition and background
             String weatherCondition = (String) weatherData.get("weather_condition");

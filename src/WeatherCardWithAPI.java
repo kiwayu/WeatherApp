@@ -1,4 +1,5 @@
 import org.json.simple.JSONObject;
+import org.json.simple.JSONArray;
 
 import javax.swing.*;
 import javax.swing.event.DocumentEvent;
@@ -16,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 /**
  * Complete Weather Card Application with API Integration
@@ -52,21 +56,27 @@ public class WeatherCardWithAPI extends JFrame {
     private JScrollPane suggestionScrollPane;
     
     // City suggestions database
-    private final List<String> WORLD_CITIES = Arrays.asList(
-        "London", "New York", "Tokyo", "Paris", "Berlin", "Madrid", "Rome", "Amsterdam", "Vienna", "Prague",
-        "Barcelona", "Munich", "Stockholm", "Copenhagen", "Oslo", "Helsinki", "Dublin", "Edinburgh", "Lisbon",
-        "Athens", "Budapest", "Warsaw", "Zurich", "Geneva", "Brussels", "Luxembourg", "Monaco", "San Marino",
-        "Moscow", "St. Petersburg", "Kiev", "Minsk", "Riga", "Vilnius", "Tallinn", "Reykjavik", "Istanbul",
-        "Ankara", "Cairo", "Alexandria", "Casablanca", "Tunis", "Algiers", "Rabat", "Lagos", "Accra", "Nairobi",
-        "Cape Town", "Johannesburg", "Durban", "Mumbai", "Delhi", "Bangalore", "Chennai", "Kolkata", "Beijing",
-        "Shanghai", "Guangzhou", "Seoul", "Busan", "Bangkok", "Manila", "Jakarta", "Sydney", "Melbourne", "Brisbane",
-        "Auckland", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego",
-        "Dallas", "San Jose", "Austin", "Jacksonville", "Fort Worth", "Columbus", "Charlotte", "San Francisco",
-        "Indianapolis", "Seattle", "Denver", "Washington", "Boston", "Nashville", "Detroit", "Portland", "Las Vegas",
-        "Memphis", "Louisville", "Baltimore", "Milwaukee", "Albuquerque", "Tucson", "Fresno", "Sacramento",
-        "Kansas City", "Mesa", "Atlanta", "Omaha", "Colorado Springs", "Raleigh", "Miami", "Oakland", "Minneapolis",
-        "Tampa", "New Orleans", "Cleveland", "Toronto", "Montreal", "Calgary", "Ottawa", "Edmonton", "Vancouver"
-    );
+    // Enhanced search with caching for better performance
+    private final Map<String, List<LocationSuggestion>> searchCache = new ConcurrentHashMap<>();
+    private Timer suggestionTimer;
+    
+    // Location suggestion with country information
+    private static class LocationSuggestion {
+        final String name;
+        final String country;
+        final String displayText;
+        
+        LocationSuggestion(String name, String country) {
+            this.name = name;
+            this.country = country;
+            this.displayText = name + (country != null && !country.isEmpty() ? ", " + country : "");
+        }
+        
+        @Override
+        public String toString() {
+            return displayText;
+        }
+    }
     
     public WeatherCardWithAPI() {
         setTitle("Weather Card - Complete Edition");
@@ -130,24 +140,41 @@ public class WeatherCardWithAPI extends JFrame {
     }
     
     private void createSearchField() {
-        searchField = new JTextField("Enter city name...");
+        searchField = new JTextField("Enter city name...") {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Paint rounded background
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+                
+                // Paint border
+                g2d.setColor(new Color(255, 255, 255, 150));
+                g2d.setStroke(new BasicStroke(2));
+                g2d.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 12, 12);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         searchField.setBounds(WINDOW_MARGIN, WINDOW_MARGIN, CARD_WIDTH, SEARCH_HEIGHT);
         searchField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         searchField.setForeground(new Color(100, 100, 100));
         searchField.setBackground(new Color(255, 255, 255, 230));
-        searchField.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(new Color(255, 255, 255, 150), 2, true),
-            BorderFactory.createEmptyBorder(12, 16, 12, 16)
-        ));
+        searchField.setOpaque(false);
+        searchField.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
         
-        // Add document listener for real-time suggestions
+        // Add document listener for real-time suggestions with debouncing
         searchField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
-            public void insertUpdate(DocumentEvent e) { updateSuggestions(); }
+            public void insertUpdate(DocumentEvent e) { debounceUpdateSuggestions(); }
             @Override
-            public void removeUpdate(DocumentEvent e) { updateSuggestions(); }
+            public void removeUpdate(DocumentEvent e) { debounceUpdateSuggestions(); }
             @Override
-            public void changedUpdate(DocumentEvent e) { updateSuggestions(); }
+            public void changedUpdate(DocumentEvent e) { debounceUpdateSuggestions(); }
         });
         
         searchField.addFocusListener(new FocusAdapter() {
@@ -157,7 +184,7 @@ public class WeatherCardWithAPI extends JFrame {
                     searchField.setText("");
                     searchField.setForeground(new Color(50, 50, 50));
                 }
-                updateSuggestions();
+                debounceUpdateSuggestions();
             }
             
             @Override
@@ -182,8 +209,10 @@ public class WeatherCardWithAPI extends JFrame {
         suggestionList = new JList<>();
         suggestionList.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         suggestionList.setBackground(new Color(255, 255, 255, 240));
-        suggestionList.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200), 1));
-        suggestionList.setSelectionBackground(new Color(100, 149, 237, 100));
+        suggestionList.setForeground(new Color(60, 60, 60));
+        suggestionList.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
+        suggestionList.setSelectionBackground(new Color(GRADIENT_START.getRed(), GRADIENT_START.getGreen(), GRADIENT_START.getBlue(), 100));
+        suggestionList.setSelectionForeground(Color.WHITE);
         suggestionList.setVisibleRowCount(6);
         
         suggestionList.addMouseListener(new MouseAdapter() {
@@ -200,28 +229,97 @@ public class WeatherCardWithAPI extends JFrame {
             }
         });
         
-        suggestionScrollPane = new JScrollPane(suggestionList);
+        suggestionScrollPane = new JScrollPane(suggestionList) {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2d = (Graphics2D) g.create();
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                // Paint rounded background
+                g2d.setColor(getBackground());
+                g2d.fillRoundRect(0, 0, getWidth(), getHeight(), 10, 10);
+                
+                g2d.dispose();
+                super.paintComponent(g);
+            }
+        };
+        
         suggestionScrollPane.setBounds(WINDOW_MARGIN, WINDOW_MARGIN + SEARCH_HEIGHT + 5, CARD_WIDTH, 120);
         suggestionScrollPane.setVisible(false);
-        suggestionScrollPane.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200), 1, true));
+        suggestionScrollPane.setOpaque(false);
+        suggestionScrollPane.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200, 150), 1, true),
+            BorderFactory.createEmptyBorder(4, 4, 4, 4)
+        ));
+        suggestionScrollPane.setBackground(new Color(255, 255, 255, 250));
+        suggestionScrollPane.getViewport().setOpaque(false);
+    }
+    
+    private void debounceUpdateSuggestions() {
+        if (suggestionTimer != null) {
+            suggestionTimer.stop();
+        }
+        suggestionTimer = new Timer(300, e -> updateSuggestions());
+        suggestionTimer.setRepeats(false);
+        suggestionTimer.start();
     }
     
     private void updateSuggestions() {
         String input = searchField.getText().trim();
-        if (input.isEmpty() || input.equals("Enter city name...")) {
+        if (input.isEmpty() || input.equals("Enter city name...") || input.length() < 2) {
             suggestionScrollPane.setVisible(false);
             return;
         }
         
-        List<String> matches = WORLD_CITIES.stream()
-            .filter(city -> city.toLowerCase().startsWith(input.toLowerCase()))
-            .limit(6)
-            .collect(Collectors.toList());
+        // Check cache first
+        String cacheKey = input.toLowerCase();
+        if (searchCache.containsKey(cacheKey)) {
+            List<LocationSuggestion> cachedResults = searchCache.get(cacheKey);
+            displaySuggestions(cachedResults);
+            return;
+        }
         
-        if (matches.isEmpty()) {
+        // Fetch suggestions from geocoding API asynchronously
+        CompletableFuture.supplyAsync(() -> fetchLocationSuggestions(input))
+            .thenAccept(suggestions -> {
+                SwingUtilities.invokeLater(() -> {
+                    if (suggestions != null && !suggestions.isEmpty()) {
+                        searchCache.put(cacheKey, suggestions);
+                        displaySuggestions(suggestions);
+                    } else {
+                        suggestionScrollPane.setVisible(false);
+                    }
+                });
+            });
+    }
+    
+    private List<LocationSuggestion> fetchLocationSuggestions(String input) {
+        try {
+            JSONArray locationData = WeatherApp.getLocationData(input);
+            if (locationData == null) return new ArrayList<>();
+            
+            List<LocationSuggestion> suggestions = new ArrayList<>();
+            for (int i = 0; i < Math.min(locationData.size(), 6); i++) {
+                JSONObject location = (JSONObject) locationData.get(i);
+                String name = (String) location.get("name");
+                String country = (String) location.get("country");
+                suggestions.add(new LocationSuggestion(name, country));
+            }
+            return suggestions;
+        } catch (Exception e) {
+            System.err.println("Error fetching location suggestions: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+    
+    private void displaySuggestions(List<LocationSuggestion> suggestions) {
+        if (suggestions.isEmpty()) {
             suggestionScrollPane.setVisible(false);
         } else {
-            suggestionList.setListData(matches.toArray(new String[0]));
+            String[] suggestionArray = suggestions.stream()
+                .map(LocationSuggestion::toString)
+                .toArray(String[]::new);
+            suggestionList.setListData(suggestionArray);
             suggestionScrollPane.setVisible(true);
         }
     }
