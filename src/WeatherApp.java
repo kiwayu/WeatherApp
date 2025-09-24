@@ -27,7 +27,9 @@ public class WeatherApp {
         // build API request URL with location coordinates
         String urlString = "https://api.open-meteo.com/v1/forecast?" +
                 "latitude=" + latitude + "&longitude=" + longitude +
-                "&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&wind_speed_unit=mph&timezone=GMT";
+                "&hourly=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                "&wind_speed_unit=mph&timezone=auto&forecast_days=7";
 
         try{
             // call API and get response
@@ -89,6 +91,11 @@ public class WeatherApp {
             weatherData.put("humidity", humidity);
             weatherData.put("windspeed", windspeed);
 
+            // Add forecast data
+            JSONObject daily = (JSONObject) resultJsonObj.get("daily");
+            if (daily != null) {
+                weatherData.put("forecast", daily);
+            }
 
             return weatherData;
 
