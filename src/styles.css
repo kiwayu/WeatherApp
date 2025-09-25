@@ -1,0 +1,71 @@
+/* Hyper-Detailed Weather Card Styles */
+
+.weather-card {
+    -fx-background-radius: 20px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 16, 0.5, 0, 8);
+}
+
+.temperature-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: white;
+    -fx-font-weight: 100; /* Ultra thin */
+}
+
+.time-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: white;
+    -fx-font-weight: 100; /* Ultra thin */
+}
+
+.date-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: rgba(255,255,255,0.8);
+    -fx-font-weight: normal;
+}
+
+.location-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: rgba(255,255,255,0.9);
+    -fx-font-weight: normal;
+}
+
+.day-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: rgba(255,255,255,0.9);
+    -fx-font-weight: normal;
+}
+
+.hourly-time-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: rgba(255,255,255,0.7);
+    -fx-font-weight: normal;
+}
+
+.hourly-temp-text {
+    -fx-font-smoothing-type: lcd;
+    -fx-text-fill: white;
+    -fx-font-weight: normal;
+}
+
+/* Scene background gradient */
+.scene-root {
+    -fx-background-color: linear-gradient(to bottom right, #8360c3, #2ebf91);
+}
+
+/* Weather icon animations */
+.weather-icon {
+    -fx-effect: dropshadow(gaussian, rgba(255,255,255,0.3), 4, 0.3, 0, 0);
+}
+
+/* Mini weather card styling */
+.mini-weather-card {
+    -fx-spacing: 8px;
+    -fx-alignment: center;
+    -fx-pref-width: 50px;
+}
+
+/* Divider line styling */
+.divider-line {
+    -fx-stroke: rgba(255,255,255,0.3);
+    -fx-stroke-width: 1px;
+}
